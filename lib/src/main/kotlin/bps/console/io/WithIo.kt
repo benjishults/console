@@ -1,7 +1,9 @@
 package bps.console.io
 
-// NOTE will probably replace this with context parameters once Kotlin has those.
-data class WithIo(
-    val inputReader: InputReader = DefaultInputReader,
-    val outPrinter: OutPrinter = DefaultOutPrinter,
-)
+/**
+ * NOTE: this will likely be replaced by context parameters in a future version (once that feature exists :smile:).
+ */
+interface WithIo {
+    val inputReader: InputReader get() = DefaultInputReader
+    val outPrinter: OutPrinter get() = DefaultOutPrinter
+}
