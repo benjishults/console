@@ -31,4 +31,4 @@ jobs:
         #          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
         #          ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.SIGNING_KEY_ID }}
         #          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
-        run: ./gradlew publish # -Dgit.tag="${{ github.ref_name }}" # -Dgit.ref="${{ github.ref }}" -Dgit.branch="${{ github.ref }}"
+        run: ./gradlew :lib:publish # -Dgit.tag="${{ github.ref_name }}" # -Dgit.ref="${{ github.ref }}" -Dgit.branch="${{ github.ref }}"
