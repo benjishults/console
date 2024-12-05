@@ -29,25 +29,25 @@ plugins {
     // must be applied to root project
 //    id("io.github.gradle-nexus.publish-plugin")// version "2.0.0"
     // define version based on git tag status
-    id("me.qoomon.git-versioning") version "6.4.4"
+//    id("me.qoomon.git-versioning") version "6.4.4"
 }
 
-version = "0.0.0-SNAPSHOT"
-gitVersioning.apply {
-    refs {
-        branch(".+") {
-            version = "\${ref}-SNAPSHOT"
-        }
-        tag("v?(?<version>.*)") {
-            version = "\${ref.version}"
-        }
-    }
-
-    // optional fallback configuration in case of no matching ref configuration
-    rev {
-        version = "\${commit}"
-    }
-}
+//version = "0.0.0-SNAPSHOT"
+//gitVersioning.apply {
+//    refs {
+//        branch(".+") {
+//            version = "\${ref}-SNAPSHOT"
+//        }
+//        tag("v?(?<version>.*)") {
+//            version = "\${ref.version}"
+//        }
+//    }
+//
+//    // optional fallback configuration in case of no matching ref configuration
+//    rev {
+//        version = "\${commit}"
+//    }
+//}
 
 repositories {
     // Use Maven Central for resolving dependencies.
