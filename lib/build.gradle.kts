@@ -64,7 +64,7 @@ dependencies {
     testImplementation("io.kotest:kotest-runner-junit5:$kotestVersion")
     testImplementation("io.kotest:kotest-assertions-core:$kotestVersion")
     testImplementation("org.junit.jupiter:junit-jupiter")
-
+    testImplementation(project(":test"))
 }
 
 testing {
