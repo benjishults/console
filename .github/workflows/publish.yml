@@ -22,4 +22,4 @@ jobs:
       - name: Publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew :lib:publish -Pversion=${{ github.ref_name }}
+        run: ./gradlew :lib:publish :test:publish -Pversion=${{ github.ref_name }}
