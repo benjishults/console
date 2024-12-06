@@ -12,4 +12,4 @@ plugins {
 }
 
 rootProject.name = "console"
-include("lib")
+include("lib", "test")
