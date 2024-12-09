@@ -6,29 +6,32 @@ import bps.console.io.InputReader
 import bps.console.io.OutPrinter
 import bps.console.io.WithIo
 
-interface SimplePrompt<T : Any> : Prompt<T>, WithIo {
+open class SimplePrompt<T : Any>(
     // TODO specify that this shouldn't contain ending spaces or punctuation and make it so
-    val basicPrompt: String
-    override val inputReader: InputReader
-    override val outPrinter: OutPrinter
-
+    protected val basicPrompt: String,
     /**
-     * returns `true` if the input is acceptable
+     * returns `true` if the input is acceptable.  Defaults to [NonBlankStringValidator].
      */
-    val validator: StringValidator
-
+    override val inputReader: InputReader = DefaultInputReader,
+    override val outPrinter: OutPrinter = DefaultOutPrinter,
+    protected val validator: StringValidator = NonBlankStringValidator,
     /**
-     * transforms valid input into an instance of [T].
+     * transforms valid input into an instance of [T].  Default value simply casts to [T].
      */
-    val transformer: (String) -> T
+    @Suppress("UNCHECKED_CAST")
+    protected val transformer: (String) -> T = { it as T },
+) : Prompt<T>, WithIo {
+
 
     /**
+     * This is called if [validator] fails or [transformer] throws an exception.
+     *
      * The default implementation:
      * 1. prints the [message] as important,
      * 2. asks if the user wants to try again
      * 3. returns `null` if they do not want to try again.
      */
-    fun actionOnInvalid(input: String, message: String): T? {
+    protected open fun actionOnInvalid(input: String, message: String): T? {
         outPrinter.important(message)
         return if (userDoesntSayNo("Try again?"))
             this.getResult()
@@ -41,7 +44,7 @@ interface SimplePrompt<T : Any> : Prompt<T>, WithIo {
      * the result of calling [actionOnInvalid] passing the user's input and the [validator]'s [StringValidator.errorMessage].
      * If [transformer] throws an exception, the [actionOnInvalid] is called with that exception's message.
      */
-    override fun getResult(): T? {
+    final override fun getResult(): T? {
         outPrinter(basicPrompt)
         return inputReader()
             .let { input: String ->
@@ -57,25 +60,6 @@ interface SimplePrompt<T : Any> : Prompt<T>, WithIo {
             }
     }
 
-    @Suppress("UNCHECKED_CAST")
-    companion object {
-        operator fun <T : Any> invoke(
-            basicPrompt: String,
-            inputReader: InputReader = DefaultInputReader,
-            outPrinter: OutPrinter = DefaultOutPrinter,
-            validator: StringValidator = NonBlankStringValidator,
-            transformer: (String) -> T = {
-                it as T
-            },
-        ) =
-            object : SimplePrompt<T> {
-                override val basicPrompt: String = basicPrompt
-                override val inputReader: InputReader = inputReader
-                override val outPrinter: OutPrinter = outPrinter
-                override val transformer: (String) -> T = transformer
-                override val validator: StringValidator = validator
-            }
-    }
 }
 
 fun WithIo.userDoesntSayNo(promptInitial: String = "Try again?") = SimplePrompt<Boolean>(

@@ -6,20 +6,26 @@ import bps.console.io.InputReader
 import bps.console.io.OutPrinter
 
 /**
- * @param additionalValidation if [validator] fails on the user's input and that input was not blank, then this will
- * be called prior to calling [transformer].
+ * This [Prompt] will try calling [transformer] on any non-blank input.
+ * @param additionalValidation if input is not blank and [transformer] throws an exception, then this will
+ * be called.  If it returns `false`, then it's [StringValidator.errorMessage] will be printed as important.
+ * If it returns `true` then we will call [transformer] again and its exception will propagate.
+ * Defaults to [AcceptAnythingStringValidator].
  * @param transformer Called on entry after it has gone through [validator] or [additionalValidation] if that fails.
  * The default implementation simply casts to [T].
  * @param T the type of the result.
  */
 open class SimplePromptWithDefault<T : Any>(
-    override val basicPrompt: String,
+    basicPrompt: String,
     val defaultValue: T,
-    override val inputReader: InputReader = DefaultInputReader,
-    override val outPrinter: OutPrinter = DefaultOutPrinter,
+    inputReader: InputReader = DefaultInputReader,
+    outPrinter: OutPrinter = DefaultOutPrinter,
     /**
-     * If [validator] fails on the user's input and that input was not blank, then this will be called prior to
-     * calling [transformer]
+     * if input is not blank and [transformer] throws an exception, then this will
+     * be called on the input.  If it returns `false`, then it's [StringValidator.errorMessage] will be printed as
+     * important.
+     * If it returns `true` then we will call [transformer] again and its exception will propagate.
+     * Defaults to [AcceptAnythingStringValidator].
      */
     val additionalValidation: StringValidator = AcceptAnythingStringValidator,
     /**
@@ -28,13 +34,14 @@ open class SimplePromptWithDefault<T : Any>(
      * The default implementation simply casts to [T]
      */
     @Suppress("UNCHECKED_CAST")
-    override val transformer: (String) -> T = { it as T },
-) : SimplePrompt<T> {
-
-    /**
-     * Fails if the input is blank.
-     */
-    final override val validator: StringValidator = NonBlankStringValidator
+    transformer: (String) -> T = { it as T },
+) : SimplePrompt<T>(
+    basicPrompt = basicPrompt,
+    validator = NonBlankStringValidator,
+    transformer = transformer,
+    inputReader = inputReader,
+    outPrinter = outPrinter,
+) {
 
     /**
      * This implementation:
@@ -50,7 +57,7 @@ open class SimplePromptWithDefault<T : Any>(
             transformer(input)
         else {
             outPrinter.important(additionalValidation.errorMessage)
-            super.actionOnInvalid(input, message)
+            super.actionOnInvalid(input, "")
         }
 
 }
