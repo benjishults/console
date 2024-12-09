@@ -2,7 +2,8 @@ package bps.console.io
 
 fun interface OutPrinter : (String) -> Unit {
     fun important(message: String) {
-        invoke("\n$message\n\n")
+        if (message.isNotBlank())
+            invoke("\n$message\n\n")
     }
 }
 

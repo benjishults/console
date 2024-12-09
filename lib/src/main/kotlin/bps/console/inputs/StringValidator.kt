@@ -15,10 +15,22 @@ data object NonBlankStringValidator : StringValidator {
 
 }
 
-data object AcceptAnythingStringValidator : StringValidator {
-    override fun invoke(entry: String): Boolean = true
+abstract class AcceptAnythingStringValidator : StringValidator {
+    override val errorMessage: String get() = ""
+    final override fun invoke(entry: String): Boolean = true
 
-    override val errorMessage: String = ""
+    companion object : AcceptAnythingStringValidator()
+}
+
+fun AcceptAnythingStringValidator(errorMessage: String): AcceptAnythingStringValidator =
+    object : AcceptAnythingStringValidator() {
+        override val errorMessage: String = errorMessage
+    }
+
+data class AcceptNothingStringValidator(
+    override val errorMessage: String = "",
+) : StringValidator {
+    override fun invoke(entry: String): Boolean = false
 }
 
 data object EmailStringValidator : StringValidator {
