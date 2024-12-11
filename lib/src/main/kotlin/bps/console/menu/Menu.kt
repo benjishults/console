@@ -1,24 +1,53 @@
 package bps.console.menu
 
 import bps.console.app.CancelHandler
+import bps.console.app.MenuSession
 import bps.console.app.TryAgainAtMostRecentMenu
+import bps.console.io.InputReader
 import bps.console.io.OutPrinter
+import bps.console.io.WithIo
 
+/**
+ *
+ */
 interface Menu {
 
-    val header: () -> String? get() = { null }
-    val prompt: () -> String get() = { "Enter selection: " }
+    val header: () -> String?
+        get() = { null }
+    val prompt: () -> String
+        get() = { "Enter selection: " }
 
     /**
      * Returns the complete list of [MenuItem]s
      */
-    val itemsGenerator: () -> List<MenuItem> get() = { emptyList() }
+    val itemsGenerator: () -> List<MenuItem>
+        get() = { emptyList() }
     val shortcutMap: Map<String, MenuItem>
 
     val cancelHandler: CancelHandler
         get() = TryAgainAtMostRecentMenu
 
-    fun List<MenuItem>.print(outPrinter: OutPrinter): List<MenuItem> =
+    fun WithIo.runMenu(menuSession: MenuSession) {
+        itemsGenerator()
+            .print(outPrinter)
+            .getSelection(inputReader)
+            ?.action
+            ?.invoke(menuSession)
+    }
+
+    private fun List<MenuItem>.getSelection(inputReader: InputReader): MenuItem? =
+        inputReader()
+            .let { inputString ->
+                this@Menu.shortcutMap[inputString]
+                    ?: inputString
+                        .toIntOrNull()
+                        ?.let {
+                            getOrNull(it - 1)
+                        }
+                // TODO add an optional error message
+            }
+
+    private fun List<MenuItem>.print(outPrinter: OutPrinter): List<MenuItem> =
         apply {
             foldIndexed(
                 header()

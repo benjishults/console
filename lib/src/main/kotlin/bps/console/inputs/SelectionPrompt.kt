@@ -5,7 +5,9 @@ import bps.console.io.DefaultOutPrinter
 import bps.console.io.InputReader
 import bps.console.io.OutPrinter
 
-// FIXME replace this with ScrollingSelectionMenu
+/**
+ * Useful when a selection needs to be made without an application running.
+ */
 interface SelectionPrompt<T : Any> : Prompt<T> {
     val header: String?
     val prompt: String

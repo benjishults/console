@@ -48,7 +48,7 @@ class MenuTest : FreeSpec(),
             inputs.addAll(listOf("1", "2", "2"))
             MenuApplicationWithQuit(topMenu, inputReader, outPrinter)
                 .use {
-                    it.run()
+                    it.runApplication()
                 }
             outputs shouldContainExactly listOf(
                 """
@@ -109,7 +109,7 @@ Quitting
             inputs.addAll(listOf("1", "b", "q"))
             MenuApplicationWithQuit(topMenu, inputReader, outPrinter)
                 .use {
-                    it.run()
+                    it.runApplication()
                 }
             outputs shouldContainExactly listOf(
                 """

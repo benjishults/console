@@ -2,6 +2,7 @@
 
 val kotestVersion: String by project
 val mockkVersion: String by project
+
 /*
 TODO
  1. try the gradle nexus plugin
@@ -103,8 +104,12 @@ publishing {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/benjishults/console")
             credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
+                username = providers
+                    .gradleProperty("github.actor")
+                    .getOrElse(System.getenv("GITHUB_ACTOR"))
+                password = providers
+                    .gradleProperty("github.token")
+                    .getOrElse(System.getenv("GITHUB_TOKEN"))
             }
         }
 //        maven {

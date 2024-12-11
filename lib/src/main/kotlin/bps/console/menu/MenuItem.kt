@@ -8,6 +8,7 @@ fun interface IntermediateMenuItemAction<out T> : () -> T
 
 object NoopIntermediateAction : IntermediateMenuItemAction<Unit> {
     override fun invoke() {
+        // NO-OP
     }
 }
 
@@ -15,19 +16,11 @@ interface MenuItem {
     val label: String
 
     /**
-     * Takes action and updates the [MenuSession].
+     * Takes action and possibly updates the [MenuSession].
      */
     val action: MenuItemAction
 
     val shortcut: String?
-
-//    companion object {
-//        operator fun invoke(label: String, action: MenuItemAction): MenuItem =
-//            object : MenuItem {
-//                override val label: String = label
-//                override val action: MenuItemAction = action
-//            }
-//    }
 
 }
 
@@ -115,9 +108,3 @@ val quitItem: MenuItem =
     BaseMenuItem("Quit", "q") { throw QuitException() }
 
 val backItem: MenuItem = popMenuItem(shortcut = "b")
-
-//fun cancelItem(inProgress: () -> Transaction.Builder? = { null }): MenuItem =
-//    item(
-//        "Cancel", "c",
-//    ) { throw CancelException(workInProgress = inProgress()) }
-////    popMenuItem(label = "Cancel", shortcut = "c")
