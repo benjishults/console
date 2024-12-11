@@ -4,14 +4,14 @@ import bps.console.io.DefaultInputReader
 import bps.console.io.DefaultOutPrinter
 import bps.console.io.InputReader
 import bps.console.io.OutPrinter
+import bps.console.io.WithIo
 import bps.console.menu.Menu
-import bps.console.menu.MenuItem
 
 open class MenuApplicationWithQuit(
     topLevelMenu: Menu,
-    val inputReader: InputReader = DefaultInputReader,
-    val outPrinter: OutPrinter = DefaultOutPrinter,
-) : MenuApplication, AutoCloseable {
+    override val inputReader: InputReader = DefaultInputReader,
+    override val outPrinter: OutPrinter = DefaultOutPrinter,
+) : MenuApplication, AutoCloseable, WithIo {
 
     private val menuSession: MenuSession = MenuSession(topLevelMenu)
 
@@ -20,19 +20,15 @@ open class MenuApplicationWithQuit(
     }
 
     /**
-     * Automatically calls [close] when quit
+     * Calls [quitAction] when quit.
      */
-    override fun run() =
+    override fun runApplication() =
         try {
             while (true) {
                 try {
-                    menuSession.current()
-                        .run {// currentMenu: Menu ->
-                            val items: List<MenuItem> = itemsGenerator().print(outPrinter)
-                            getSelection(items)
-                                ?.action
-                                ?.invoke(menuSession)
-                        }
+                    with(menuSession.current()) {
+                        runMenu(menuSession)
+                    }
                 } catch (cancelException: CancelException) {
                     outPrinter.important(cancelException.message!!)
                     cancelException.handler(menuSession)
@@ -42,17 +38,6 @@ open class MenuApplicationWithQuit(
             quitAction(quit)
         }
 
-    private fun Menu.getSelection(items: List<MenuItem>): MenuItem? =
-        inputReader()
-            .let { inputString ->
-                this.shortcutMap[inputString]
-                    ?: inputString
-                        .toIntOrNull()
-                        ?.let {
-                            items.getOrNull(it - 1)
-                        }
-                // TODO add an optional error message
-            }
 
     override fun close() {
         menuSession.close()

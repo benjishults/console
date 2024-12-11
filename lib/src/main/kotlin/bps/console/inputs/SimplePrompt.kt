@@ -9,11 +9,11 @@ import bps.console.io.WithIo
 open class SimplePrompt<T : Any>(
     // TODO specify that this shouldn't contain ending spaces or punctuation and make it so
     protected val basicPrompt: String,
+    override val inputReader: InputReader = DefaultInputReader,
+    override val outPrinter: OutPrinter = DefaultOutPrinter,
     /**
      * returns `true` if the input is acceptable.  Defaults to [NonBlankStringValidator].
      */
-    override val inputReader: InputReader = DefaultInputReader,
-    override val outPrinter: OutPrinter = DefaultOutPrinter,
     protected val validator: StringValidator = NonBlankStringValidator,
     /**
      * transforms valid input into an instance of [T].  Default value simply casts to [T].
@@ -21,7 +21,6 @@ open class SimplePrompt<T : Any>(
     @Suppress("UNCHECKED_CAST")
     protected val transformer: (String) -> T = { it as T },
 ) : Prompt<T>, WithIo {
-
 
     /**
      * This is called if [validator] fails or [transformer] throws an exception.
@@ -61,21 +60,3 @@ open class SimplePrompt<T : Any>(
     }
 
 }
-
-fun WithIo.userDoesntSayNo(promptInitial: String = "Try again?") = SimplePrompt<Boolean>(
-    basicPrompt = "$promptInitial [Y/n]: ",
-    inputReader = inputReader,
-    outPrinter = outPrinter,
-    validator = AcceptAnythingStringValidator,
-    transformer = { it !in listOf("n", "N") },
-)
-    .getResult()!!
-
-fun WithIo.userSaysYes(promptInitial: String = "Try again?") = SimplePrompt<Boolean>(
-    basicPrompt = "$promptInitial [y/N]: ",
-    inputReader = inputReader,
-    outPrinter = outPrinter,
-    validator = AcceptAnythingStringValidator,
-    transformer = { it in listOf("y", "Y") },
-)
-    .getResult()!!

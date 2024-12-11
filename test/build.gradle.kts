@@ -1,4 +1,12 @@
 val kotestVersion: String by project
+val gitHubActor: String =
+    providers
+        .gradleProperty("github.actor")
+        .getOrElse(System.getenv("GITHUB_ACTOR"))
+val gitHubToken: String =
+    providers
+        .gradleProperty("github.token")
+        .getOrElse(System.getenv("GITHUB_TOKEN"))
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -29,8 +37,8 @@ publishing {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/benjishults/console")
             credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
+                username = gitHubActor
+                password = gitHubToken
             }
         }
     }

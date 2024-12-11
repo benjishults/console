@@ -34,7 +34,7 @@ class ScrollingSelectionMenuTest : FreeSpec(),
             inputs.addAll(listOf("2", "4", "2", "7"))
             MenuApplicationWithQuit(subject, inputReader, outPrinter)
                 .use {
-                    it.run()
+                    it.runApplication()
                 }
             outputs shouldContainExactly listOf(
                 firstGroup,
@@ -71,7 +71,7 @@ Quitting
             inputs.addAll(listOf("4", "4", "4", "1", "5", "5", "4", "5", "5", "4", "7"))
             MenuApplicationWithQuit(subject, inputReader, outPrinter)
                 .use {
-                    it.run()
+                    it.runApplication()
                 }
             outputs shouldContainExactly listOf(
                 firstGroup,
@@ -120,7 +120,7 @@ Quitting
             inputs.addAll(listOf("4", "4", "4", "2", "5", "5", "4", "5", "6"))
             MenuApplicationWithQuit(subject, inputReader, outPrinter)
                 .use {
-                    it.run()
+                    it.runApplication()
                 }
             outputs shouldContainExactly listOf(
                 firstGroup,

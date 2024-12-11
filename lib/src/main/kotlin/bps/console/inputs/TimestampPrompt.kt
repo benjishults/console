@@ -1,6 +1,5 @@
 package bps.console.inputs
 
-import bps.console.app.TryAgainAtMostRecentMenuException
 import bps.console.io.DefaultInputReader
 import bps.console.io.DefaultOutPrinter
 import bps.console.io.InputReader
@@ -12,9 +11,12 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
-import java.lang.Exception
 
-class UserNotEnteringDate(
+/**
+ * This will be caught and mined for its message by the [SimplePrompt.getResult] function.
+ * It isn't user for anything but its message, at present, so isn't visible externally.
+ */
+private class UserNotEnteringDate(
     message: String = "User doesn't want to enter a date",
     cause: Throwable? = null,
 ) : Exception(message, cause)
@@ -146,9 +148,3 @@ fun WithIo.getTimestampFromUser(
     )
         .getResult()
         ?.toInstant(timeZone)
-
-
-//fun LocalDateTime.toInstantForTimeZone(timeZone: TimeZone): Instant =
-//    ZonedDateTime
-//        .of(this, timeZone.toZoneId())
-//        .toInstant()

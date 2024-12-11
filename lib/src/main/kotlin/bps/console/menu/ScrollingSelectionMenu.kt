@@ -45,37 +45,36 @@ open class ScrollingSelectionMenu<T>(
         require(offset >= 0) { "offset must be >= 0" }
     }
 
-    protected fun MutableList<MenuItem>.incorporateItem(menuItem: MenuItem) {
+    protected open fun MutableList<MenuItem>.incorporateItem(menuItem: MenuItem) {
         add(menuItem)
         if (menuItem.shortcut !== null)
             shortcutMap[menuItem.shortcut!!] = menuItem
     }
 
-    override var itemsGenerator: () -> List<MenuItem> =
-        {
-            generateBaseMenuItemList()
-                .also { menuItems: MutableList<MenuItem> ->
-                    if (menuItems.size == limit) {
-                        menuItems.incorporateItem(
-                            item("Next Items", "n") { menuSession ->
-                                menuSession.pop()
-                                menuSession.push(nextPageMenuProducer())
-                            },
-                        )
-                    }
-                    if (offset > 0) {
-                        menuItems.incorporateItem(
-                            item("Previous Items", "p") { menuSession ->
-                                menuSession.pop()
-                                menuSession.push(previousPageMenuProducer())
-                            },
-                        )
-                    }
-                    extraItems.forEach { menuItems.incorporateItem(it) }
-                    menuItems.incorporateItem(backItem)
-                    menuItems.incorporateItem(quitItem)
+    final override var itemsGenerator: () -> List<MenuItem> = {
+        generateBaseMenuItemList()
+            .also { menuItems: MutableList<MenuItem> ->
+                if (menuItems.size == limit) {
+                    menuItems.incorporateItem(
+                        item("Next Items", "n") { menuSession ->
+                            menuSession.pop()
+                            menuSession.push(nextPageMenuProducer())
+                        },
+                    )
                 }
-        }
+                if (offset > 0) {
+                    menuItems.incorporateItem(
+                        item("Previous Items", "p") { menuSession ->
+                            menuSession.pop()
+                            menuSession.push(previousPageMenuProducer())
+                        },
+                    )
+                }
+                extraItems.forEach { menuItems.incorporateItem(it) }
+                menuItems.incorporateItem(backItem)
+                menuItems.incorporateItem(quitItem)
+            }
+    }
 
     protected open fun previousPageMenuProducer(): ScrollingSelectionMenu<T> =
         ScrollingSelectionMenu(

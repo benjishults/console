@@ -22,7 +22,9 @@ abstract class AcceptAnythingStringValidator : StringValidator {
     companion object : AcceptAnythingStringValidator()
 }
 
-fun AcceptAnythingStringValidator(errorMessage: String): AcceptAnythingStringValidator =
+fun AcceptAnythingStringValidator(
+    errorMessage: String,
+): AcceptAnythingStringValidator =
     object : AcceptAnythingStringValidator() {
         override val errorMessage: String = errorMessage
     }
@@ -63,7 +65,10 @@ data object NonNegativeStringValidator : StringValidator {
     override val errorMessage: String = "Amount must be non-negative"
 }
 
-data class NotInListStringValidator(val list: List<String>, val label: String) : StringValidator {
+data class NotInListStringValidator(
+    val list: List<String>,
+    val label: String,
+) : StringValidator {
     override fun invoke(input: String): Boolean =
         input !in list
 
