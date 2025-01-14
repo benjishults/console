@@ -1,5 +1,5 @@
 package bps.console.app
 
-interface MenuApplication {
+interface MenuApplication: AutoCloseable {
     fun runApplication()
 }
