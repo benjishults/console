@@ -60,6 +60,3 @@ interface SimpleConsoleIoTestFixture {
     }
 
 }
-
-const val ONE_SECOND_IN_MILLIS_FOR_WAITING_FOR_PAUSE = 1_000L
-const val MAX_LONG_MILLIS_FOR_WAITING_FOR_PAUSE_DURING_DEBUGGING = Long.MAX_VALUE
