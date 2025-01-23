@@ -33,7 +33,7 @@ jobs:
           mkdir "$RUNNER_TEMP/docs/dokka/html"
           mkdir "$RUNNER_TEMP/docs/dokka/html/test"
           mkdir "$RUNNER_TEMP/docs/dokka/html/lib"
-          cp /docs/pages/* "$RUNNER_TEMP/docs"
+          cp ./docs/pages/* "$RUNNER_TEMP/docs"
           cp -R ./test/build/dokka/html/* "$RUNNER_TEMP/docs/dokka/html/test"
           cp -R ./lib/build/dokka/html/* "$RUNNER_TEMP/docs/dokka/html/lib"
           echo ::endgroup::
