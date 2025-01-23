@@ -1,0 +1,47 @@
+name: Publish Dokka to Pages
+
+on:
+  workflow_dispatch:
+  release:
+    types: [ created ]
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  dokka-to-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
+      - name: Run Dokka
+        run: ./gradlew :lib:dokkaHtml :test:dokkaHtml -Pversion=${{ github.ref_name }}
+      - name: Generate tar file
+        run: |
+          echo ::group::prepare files for archival
+          mkdir "$RUNNER_TEMP/docs"
+          mkdir "$RUNNER_TEMP/docs/dokka/html"
+          mkdir "$RUNNER_TEMP/docs/dokka/html/test"
+          mkdir "$RUNNER_TEMP/docs/dokka/html/lib"
+          cp /docs/pages/* "$RUNNER_TEMP/docs"
+          cp -R ./test/build/dokka/html/* "$RUNNER_TEMP/docs/dokka/html/test"
+          cp -R ./lib/build/dokka/html/* "$RUNNER_TEMP/docs/dokka/html/lib"
+          echo ::endgroup::
+          echo ::group::archive html files
+          tar --directory "$RUNNER_TEMP/docs" -cvf "$RUNNER_TEMP/artifact.tar" .
+          echo ::endgroup::
+      - name: Upload dokka artifact
+        uses: actions/upload-artifact@v4.2.0
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          if-no-files-found: error
