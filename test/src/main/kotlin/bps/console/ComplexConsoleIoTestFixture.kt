@@ -116,8 +116,6 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
      */
     fun validateApplicationPaused()
 
-// TODO add a function to validate outputs without expected input
-
     /**
      * Should not be called from the application thread.  Call [waitForApplicationProcessing] after setting [inputs]
      * and before validation of [outputs] in order to
