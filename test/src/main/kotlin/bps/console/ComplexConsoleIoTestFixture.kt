@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package bps.console
 
 import bps.console.app.MenuApplication
@@ -18,8 +20,7 @@ import kotlin.concurrent.thread
 /**
  * This fixture allows the application and the test validations to interact with each other in a thread-safe way.
  * The application is run in its own thread but it will pause between tests to allow the test code to validate
- * the outputs (and allowing the JDBC connection to remain open between tests).  Using the [validateInteraction]
- * function will work for most use cases.
+ * the outputs.
  *
  * Usage:
  *
@@ -71,6 +72,7 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
     fun validateInteraction(expectedOutputs: List<String>, toInput: List<String>) {
         require(toInput.isNotEmpty())
         outputs.clear()
+        inputs.shouldBeEmpty()
         inputs.addAll(toInput)
         waitForApplicationProcessing()
         inputs.shouldBeEmpty()
@@ -145,7 +147,9 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
 
     companion object {
 
-        enum class Owner {
+        class ApplicationExitException(msg: String) : Exception(msg)
+
+        enum class AppStatus {
             /**
              * Indicates that the test is starting up and either thread might try to update data first.
              */
@@ -154,12 +158,12 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
             /**
              * Indicates that the application thread owns the permit on [takeTurns]
              */
-            APP,
+            RUNNING,
 
             /**
              * Indicates that the application is waiting for input from the test.
              */
-            TEST,
+            PAUSED,
 
             /**
              * Indicates that the application thread has exited.
@@ -178,29 +182,52 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
                  * Should only be set by the application thread while it has a permit on [takeTurns]
                  *
                  * INVARIANTS:
-                 * 1. This will only change values when the application thread owns the permit on [takeTurns]
-                 * 2. If the value is APP, then the application thread definitely owns a permit
-                 * 3. This is set to TEST when the application is waiting for input
+                 * 1. This will only change values when the application thread owns the permit on [takeTurns].
+                 * 2. If the value is [AppStatus.RUNNING], then the application thread definitely owns a permit.
+                 * 3. If the application is paused, then this will be [AppStatus.PAUSED].
+                 * 4. If the application is terminated, then this will be [AppStatus.APP_DONE].
+                 * 5. If the application has not yet tried to read input or produce output, then this will be [AppStatus.START_UP].
                  */
                 @Volatile
-                private var owner: Owner = Owner.START_UP
+                private var appStatus: AppStatus = AppStatus.START_UP
+
+                /**
+                 * INVARIANTS:
+                 * 1. If this is `true`, then the test has prepared some input and the application has not acknowledged it.
+                 * 2. If this is `false`, then the TEST is free to take action.  The test should wait until this is `false` before taking back control unless [appStatus] is [AppStatus.APP_DONE]
+                 * 3. This value will only be changed by a thread that has a permit on [takeTurns]
+                 *
+                 * The application will set this to `false` when it wakes up from waiting for a permit on [takeTurns].
+                 *
+                 * The application will only change this value when [appStatus] is [AppStatus.RUNNING].
+                 *
+                 * The test will only change this value when [appStatus] is not [AppStatus.RUNNING].
+                 */
+                @Volatile
+                private var applicationHasUnackedTurnover: Boolean = false
 
                 /**
                  * Ensure the application and test aren't messing each other up.
                  *
                  * Should never have more than one permit.
                  *
-                 * When [owner] is [Owner.START_UP], the application cannot output until the test is ready.  That
+                 * When [appStatus] is [AppStatus.START_UP], the application cannot output until the test is ready.  That
                  * readiness is indicated by the test creating a permit with a call to [Semaphore.release].
                  */
                 // NOTE the test is expected to release (or create) a permit when it has inputs ready for the application
                 // NOTE application should be careful not to call release unless it has a permit otherwise another permit will be created
                 private val takeTurns = object : Semaphore(0, true) {
-                    override fun acquire() {
+
+//                    fun applicationTryAquire(timeout: Long, unit: TimeUnit?): Boolean {
+//                        // NOTE this is a not-completely-effective way to try to catch cases when there are plural permits
+//                        return tryAcquire(timeout, unit)
+//                    }
+
+                    override fun tryAcquire(timeout: Long, unit: TimeUnit?): Boolean {
                         // NOTE this is a not-completely-effective way to try to catch cases when there are plural permits
                         if (availablePermits() > 1)
                             throw IllegalStateException("takeTurns must never have more than one permit")
-                        super.acquire()
+                        return super.tryAcquire(timeout, unit)
                     }
 
                     override fun release() {
@@ -220,53 +247,67 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
                 override val outputs = CopyOnWriteArrayList<String>()
 
                 override val inputReader = InputReader {
-                    if (owner === Owner.APP) {
-                        if (inputs.isNotEmpty())
-                            inputs.removeFirst()
-                        else {
-                            // application expected input that wasn't there
-                            owner = Owner.APP_DONE
-                            takeTurns.release()
-                            throw IllegalStateException("application was expecting more input than what was provided")
+                    when (appStatus) {
+                        AppStatus.RUNNING -> {
+                            if (inputs.isNotEmpty())
+                                inputs.removeFirst()
+                            else {
+                                // application expected input that wasn't there
+                                applicationHasUnackedTurnover = false
+                                appStatus = AppStatus.APP_DONE
+                                takeTurns.release()
+                                throw ApplicationExitException("application was expecting more input than what was provided")
+                            }
                         }
-                    } else if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
-                        owner = Owner.APP_DONE
-                        throw IllegalStateException("Unable to acquire permit for application thread")
-                    } else {
-                        // NOTE at this point, the application thread has a permit and owns the data.
-                        owner = Owner.APP
-                        inputs.removeFirst()
+                        AppStatus.START_UP, AppStatus.PAUSED -> {
+                            if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
+                                appStatus = AppStatus.APP_DONE
+                                throw ApplicationExitException("Unable to acquire permit for application thread within $awaitMillis milliseconds")
+                            } else {
+                                // NOTE at this point, the application thread has a permit and owns the data.
+                                appStatus = AppStatus.RUNNING
+                                inputs.removeFirst()
+                            }
+                        }
+                        AppStatus.APP_DONE -> throw ApplicationExitException("application was caught asking for input after reporting it had terminated")
                     }
                 }
 
                 // NOTE the application can only output when it owns a permit on [takeTurns]
                 // NOTE when the inputs is empty, the application will release the permit, set the owner as TEST and wait for another permit
                 // NOTE only the application calls this
+                // TODO how about allow output when inputs is empty?
+                //       1. the application would start editing outputs right away (may not be a problem as long as test doesn't check those until application is paused.)
+                //       2. test would have to expect outputs in a different way
                 override val outPrinter = OutPrinter {
-                    // FIXME there is probably a slight race condition here.  On startup, the app might get to this code
-                    //       at the same moment the test is turning over control.  Can we say that only the app thread
-                    //       can change the value of owner?
-                    if (owner !== Owner.APP) {
-                        if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
-                            owner = Owner.APP_DONE
-                            throw IllegalStateException("Unable to acquire permit for application thread")
-                        } else {
-                            // NOTE at this point, the application thread has a permit and owns the data.
-                            owner = Owner.APP
+                    when (appStatus) {
+                        AppStatus.RUNNING -> {}
+                        AppStatus.START_UP, AppStatus.PAUSED, AppStatus.APP_DONE -> {
+                            if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
+                                appStatus = AppStatus.APP_DONE
+                                throw ApplicationExitException("Unable to acquire permit for application thread within $awaitMillis milliseconds")
+                            } else {
+                                // NOTE at this point, the application thread has a permit and owns the data.
+                                appStatus = AppStatus.RUNNING
+                            }
                         }
                     }
-                    // NOTE at this point, the application thread has a permit and owns the data.
+                    // NOTE at this point, appStatus is RUNNING and the application thread has a permit.
+                    // NOTE pause if there are no inputs
                     while (inputs.isEmpty()) {
-                        owner = Owner.TEST
-                        takeTurns.release()
-                        // NOTE the semaphore is fair so the test thread should pick it up.
-                        // NOTE we want to allow this to be interrupted by the test thread
-                        if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
-                            owner = Owner.APP_DONE
-                            throw IllegalStateException("Unable to acquire permit for application thread")
-                        } else {
-                            owner = Owner.APP
-                        }
+                        // NOTE can there be a race condition here?  I think not because the app thread owns a permit
+                        applicationHasUnackedTurnover = false
+                        do {
+                            appStatus = AppStatus.PAUSED
+                            takeTurns.release()
+                            // NOTE we want to allow this to be interrupted by the test thread
+                            if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
+                                appStatus = AppStatus.APP_DONE
+                                throw ApplicationExitException("Unable to acquire permit for application thread within $awaitMillis milliseconds")
+                            } else {
+                                appStatus = AppStatus.RUNNING
+                            }
+                        } while (!applicationHasUnackedTurnover)
                     }
                     // NOTE at this point, the application thread has a permit and owns the data.
                     outputs.add(it)
@@ -278,31 +319,45 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
                  */
                 // NOTE only the test thread calls this
                 override fun waitForApplicationProcessing() {
-                    when (owner) {
-                        Owner.TEST, Owner.START_UP -> {
-                            owner = Owner.APP
+                    when (appStatus) {
+                        AppStatus.PAUSED, AppStatus.START_UP -> {
+                            applicationHasUnackedTurnover = true
+//                            appStatus = AppStatus.RUNNING
                             takeTurns.release()
                         }
-                        Owner.APP_DONE -> fail("application exited unexpectedly")
-                        Owner.APP -> fail("test and application running simultaneously")
-                    }
-                    while (owner !== Owner.APP_DONE && outputs.isEmpty()) {
-                        println("Test waiting for application thread")
-                        if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
+                        AppStatus.APP_DONE -> fail("application exited unexpectedly")
+                        AppStatus.RUNNING -> {
                             stopApplication()
-                            fail("Unable to acquire permit from application thread")
+                            fail("test and application running simultaneously")
+                        }
+                    }
+                    if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
+                        stopApplication()
+                        fail("Unable to acquire permit from application thread within $awaitMillis milliseconds")
+                    } else {
+                        // NOTE this thread has a permit
+                        while (appStatus !== AppStatus.APP_DONE && applicationHasUnackedTurnover) {
+                            // NOTE must be that the application hasn't picked up the permit, yet.  We need to keep giving it chances.
+                            println("Test waiting for application thread to take a permit")
+                            takeTurns.release()
+                            if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
+                                stopApplication()
+                                fail("Unable to acquire permit from application thread within $awaitMillis milliseconds")
+                            }
                         }
                     }
                 }
 
                 override fun validateApplicationTerminated() {
                     applicationThread.join(awaitMillis)
-                    applicationThread.state shouldBe Thread.State.TERMINATED
-                    owner shouldBe Owner.APP_DONE
+                    withClue("application thread should have terminated within $awaitMillis milliseconds") {
+                        applicationThread.state shouldBe Thread.State.TERMINATED
+                    }
+                    appStatus shouldBe AppStatus.APP_DONE
                 }
 
                 override fun validateApplicationPaused() {
-                    owner shouldNotBe Owner.APP_DONE
+                    appStatus shouldNotBe AppStatus.APP_DONE
                     applicationThread.state shouldNotBe Thread.State.TERMINATED
                 }
 
@@ -318,10 +373,12 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
                             override fun close() {
                                 application.close()
                                 // NOTE immediately give control back to test
-                                val priorOwner = owner
-                                owner = Owner.APP_DONE
-                                if (priorOwner === Owner.APP) {
+                                if (appStatus == AppStatus.RUNNING || applicationHasUnackedTurnover) {
+                                    appStatus = AppStatus.APP_DONE
+                                    applicationHasUnackedTurnover = false
                                     takeTurns.release()
+                                } else {
+                                    appStatus = AppStatus.APP_DONE
                                 }
                             }
                         }
@@ -335,7 +392,10 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
                 // NOTE only test code calls this
                 override fun stopApplication() {
                     applicationThread.interrupt()
-                    applicationThread.join()
+                    applicationThread.join(awaitMillis)
+                    withClue("application thread should have terminated within $awaitMillis milliseconds") {
+                        applicationThread.state shouldBe Thread.State.TERMINATED
+                    }
                     println("Application stopped")
                 }
 
