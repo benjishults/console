@@ -16,6 +16,9 @@ permissions:
 
 jobs:
   dokka-to-pages:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,3 +49,6 @@ jobs:
           name: github-pages
           path: ${{ runner.temp }}/artifact.tar
           if-no-files-found: error
+      - name: Deploy pages from artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
