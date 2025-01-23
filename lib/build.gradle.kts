@@ -24,31 +24,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     `maven-publish`
     `java-library`
-//    signing
-    // supposed to simplify maven publishing?
-//    id("org.jreleaser") version "1.15.0"
-    // must be applied to root project
-//    id("io.github.gradle-nexus.publish-plugin")// version "2.0.0"
-    // define version based on git tag status
-//    id("me.qoomon.git-versioning") version "6.4.4"
 }
-
-//version = "0.0.0-SNAPSHOT"
-//gitVersioning.apply {
-//    refs {
-//        branch(".+") {
-//            version = "\${ref}-SNAPSHOT"
-//        }
-//        tag("v?(?<version>.*)") {
-//            version = "\${ref.version}"
-//        }
-//    }
-//
-//    // optional fallback configuration in case of no matching ref configuration
-//    rev {
-//        version = "\${commit}"
-//    }
-//}
 
 repositories {
     // Use Maven Central for resolving dependencies.
@@ -83,23 +59,8 @@ java {
     withSourcesJar()
 }
 
-//nexusPublishing {
-//    repositories {
-//        sonatype {  //only for users registered in Sonatype after 24 Feb 2021
-//            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-//            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
-//            username = ""
-//            password = ""
-//
-//        }
-//    }
-//}
-
 publishing {
     repositories {
-//        maven {
-//            url = uri(layout.buildDirectory.dir("staging-deploy"))
-//        }
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/benjishults/console")
@@ -112,16 +73,6 @@ publishing {
                     .getOrElse(System.getenv("GITHUB_TOKEN"))
             }
         }
-//        maven {
-//            name = "OSSRH"
-//            val releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
-//            val snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-//            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
-//            credentials {
-//                username = System.getenv("MAVEN_USERNAME")
-//                password = System.getenv("MAVEN_PASSWORD")
-//            }
-//        }
     }
     publications {
         create<MavenPublication>("GitHubPackages") {
@@ -142,33 +93,3 @@ publishing {
         }
     }
 }
-
-//signing {
-//    val signingKeyId: String? by project
-//    val signingKey: String? by project
-//    val signingPassword: String? by project
-//    useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
-//    sign(publishing.publications["maven"])
-//}
-
-//jreleaser {
-//    gitRootSearch = true
-//    signing {
-//        active.set(Active.ALWAYS)
-//        armored.set(true)
-//    }
-//    deploy {
-//        maven {
-//            nexus2 {
-//                create("maven") {
-//                    active.set(Active.ALWAYS)
-//                    url.set("https://s01.oss.sonatype.org/service/local")
-//                    snapshotUrl.set("https://s01.oss.sonatype.org/content/repositories/snapshots/")
-//                    closeRepository.set(true)
-//                    releaseRepository.set(true)
-//                    stagingRepository("staging-deploy")
-//                }
-//            }
-//        }
-//    }
-//}

@@ -1,22 +1,30 @@
 package bps.console
 
+import bps.console.app.MenuApplication
 import bps.console.io.InputReader
 import bps.console.io.OutPrinter
-import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.assertions.fail
+import io.kotest.assertions.withClue
+import io.kotest.core.spec.Spec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.shouldBe
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 
 /**
- * This fixture allows the application to pause between tests (allowing the JDBC connection to remain
- * open between tests).  Using the [validateInteraction] function will work for most use cases.
+ * This fixture allows the application and the test validations to interact with each other in a thread-safe way.
+ * The application is run in its own thread but it will pause between tests to allow the test code to validate
+ * the outputs (and allowing the JDBC connection to remain open between tests).  Using the [validateInteraction]
+ * function will work for most use cases.
  *
  * Usage:
  *
  * ```kotlin
+ *                 stopApplicationAfterSpec()
+ *                 startApplication(app)
  *                 validateInteraction(
  *                     expectedOutputs = listOf("Enter the amount of income: "),
  *                     toInput = listOf("5000"),
@@ -37,130 +45,261 @@ import java.util.concurrent.atomic.AtomicReference
  *                     toInput = listOf("", "", "2"),
  *                 )
  * ```
- * ## Expert Mode
  *
- * The application will pause automatically
- * * when [inputs] is empty
- * * just prior to printing the next output
+ * The running application will pause automatically when [inputs] is empty just prior to printing its next output
  *
- * After re-populating the [inputs] list, you can unpause the application by calling [unPause].
+ * After re-populating the [inputs] list and prior to validating the results, resume the application by calling
+ * [waitForApplicationProcessing] so that the application will run through your inputs and produce its output.
  *
- * After calling [unPause], the application will resume and run through the new inputs.
- * You will want to immediately call [waitForPause] so that the application will run through your inputs
- * prior to validating the results.
- *
- * If you want to capture the Quitting output and ensure that the application thread ends before you go on to the
- * next test, then you might ought to be using the [SimpleConsoleIoTestFixture] instead.  However, if you need to
- * use this in that way for some reason, here's how:
- *
- * ```kotlin
- *             val applicationThread = thread(name = "Application Thread 1") {
- *                 application
- *                     .use {
- *                         it.run()
- *                     }
- *             }
- *             inputs.addAll(listOf("4", "4", "4", "1", "5", "5", "4", "5", "5", "4", "7"))
- *             unPause()
- *             waitForPause()
- *             // unpause so that the process can end by printing the Quit message
- *             unPause()
- *             // make sure this thread dies so as not to interfere with later tests
- *             applicationThread.join(Duration.ofMillis(20)).shouldBeTrue()
- *             outputs shouldContainExactly listOf( /* ...*/ )
- * ```
  */
 interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
 
-    val helper: Helper
-
-    /** Call [waitForPause] before validation to allow the application to finish processing.  The application will
-     * pause automatically when the [inputs] list is emptied.
+    /**
+     * Should not be called from the application thread.
+     * @throws IllegalArgumentException if [toInput] is empty
      */
-    fun waitForPause(milliSeconds: Long): Boolean =
-        helper
-            .waitForPause
-            .get()
-            .await(helper.awaitMillis, TimeUnit.MILLISECONDS)
-
-    fun unPause() =
-        helper.unPause()
-
-    override val outputs: MutableList<String>
-        get() = helper.outputs
-    override val inputs: MutableList<String>
-        get() = helper.inputs
-    override val inputReader: InputReader
-        get() = helper.inputReader
-    override val outPrinter: OutPrinter
-        get() = helper.outPrinter
-
-    companion object {
-        operator fun invoke(debugging: Boolean = false): ComplexConsoleIoTestFixture {
-            return object : ComplexConsoleIoTestFixture {
-                override val helper: Helper =
-                    Helper(
-                        if (debugging)
-                            MAX_LONG_MILLIS_FOR_WAITING_FOR_PAUSE_DURING_DEBUGGING
-                        else
-                            ONE_SECOND_IN_MILLIS_FOR_WAITING_FOR_PAUSE,
-                    )
-            }
-        }
-    }
-
-    class Helper(val awaitMillis: Long) {
-
-        private val paused = AtomicBoolean(false)
-        private val waitForUnPause = AtomicReference(CountDownLatch(0))
-
-        // NOTE waitForPause before validation to allow the application to finish processing and get to the point of making
-        //      more output so that validation happens after processing.
-        val waitForPause = AtomicReference(CountDownLatch(1))
-
-        private fun pause() {
-//            check(!paused.get()) { "Already paused" }
-            waitForUnPause.set(CountDownLatch(1))
-            paused.set(true)
-            waitForPause.get().countDown()
-        }
-
-        fun unPause() {
-//            check(paused.get()) { "Not paused" }
-            waitForPause.set(CountDownLatch(1))
-            paused.set(false)
-            waitForUnPause.get().countDown()
-        }
-
-        // NOTE the thread clearing this is not the thread that adds to it
-        val inputs = CopyOnWriteArrayList<String>()
-        val inputReader = InputReader {
-            inputs.removeFirst()
-        }
-
-        // NOTE the thread clearing this is not the thread that adds to it
-        val outputs = CopyOnWriteArrayList<String>()
-
-        // NOTE when the inputs is empty, the application will pause itself
-        val outPrinter = OutPrinter {
-            if (inputs.isEmpty()) {
-                pause()
-            }
-            if (paused.get())
-                waitForUnPause.get()
-                    .await(awaitMillis, TimeUnit.MILLISECONDS)
-                    .shouldBeTrue()
-            outputs.add(it)
-        }
-
-    }
-
     fun validateInteraction(expectedOutputs: List<String>, toInput: List<String>) {
+        require(toInput.isNotEmpty())
         outputs.clear()
         inputs.addAll(toInput)
-        unPause()
-        waitForPause(helper.awaitMillis).shouldBeTrue()
+        waitForApplicationProcessing()
+        inputs.shouldBeEmpty()
         outputs shouldContainExactly expectedOutputs
+    }
+
+    /**
+     * Allows the application to run until it quits.
+     * Validates
+     * 1. that the application consuming the given input and no more
+     * 2. that the expected output is produced
+     * 3. that the application thread finishes
+     *
+     * Should not be called from the application thread.
+     */
+    fun validateFinalOutput(expectedOutputs: List<String>, toInput: List<String>) {
+        outputs.clear()
+        val dummyMessage = "SHOULD NOT BE CONSUMED"
+        inputs.add(dummyMessage)
+        waitForApplicationProcessing()
+        withClue("The application expected more input than was provided prior to quitting.") {
+            inputs shouldContainExactly listOf(dummyMessage)
+        }
+        outputs shouldContainExactly expectedOutputs
+    }
+
+// TODO add a function to validate outputs without expected input
+
+    /**
+     * Should not be called from the application thread.  Call [waitForApplicationProcessing] after setting [inputs]
+     * and before validation of [outputs] in order to
+     * allow the application to finish processing.  The application will
+     * pause automatically when it has processed all provided [inputs] and emptied that list.
+     */
+    fun waitForApplicationProcessing()
+
+    fun startApplicationForTesting(application: MenuApplication): Thread
+
+    fun stopApplication()
+
+    fun Spec.stopApplicationAfterSpec() {
+        afterSpec {
+            stopApplication()
+        }
+    }
+
+    companion object {
+
+        enum class Owner {
+            /**
+             * Indicates that the test is starting up and either thread might try to update data first.
+             */
+            START_UP,
+
+            /**
+             * Indicates that the application thread owns the permit on [takeTurns]
+             */
+            APP,
+
+            /**
+             * Indicates that the application is waiting for input from the test.
+             */
+            TEST,
+
+            /**
+             * Indicates that the application thread has exited.
+             */
+            APP_DONE,
+        }
+
+        operator fun invoke(awaitMillis: Long): ComplexConsoleIoTestFixture =
+            object : ComplexConsoleIoTestFixture {
+
+                /**
+                 * Should only be set by the application thread while it has a permit on [takeTurns]
+                 *
+                 * INVARIANTS:
+                 * 1. This will only change values when the application thread owns the permit on [takeTurns]
+                 * 2. If the value is APP, then the application thread definitely owns a permit
+                 * 3. This is set to TEST when the application is waiting for input
+                 */
+                @Volatile
+                private var owner: Owner = Owner.START_UP
+
+                /**
+                 * Ensure the application and test aren't messing each other up.
+                 *
+                 * Should never have more than one permit.
+                 *
+                 * When [owner] is [Owner.START_UP], the application cannot output until the test is ready indicated
+                 * by the test creating a permit.
+                 */
+                // NOTE the test is expected to release (create) a permit when it has inputs ready for the application
+                // NOTE application should be careful not to call release unless it has a permit otherwise another permit will be created
+                private val takeTurns = object : Semaphore(0, true) {
+                    override fun acquire() {
+                        // NOTE this is a not-completely-effective way to try to catch cases when there are plural permits
+                        if (availablePermits() > 1)
+                            throw IllegalStateException("takeTurns must never have more than one permit")
+                        super.acquire()
+                    }
+
+                    override fun release() {
+                        if (availablePermits() > 0)
+                            throw IllegalStateException("takeTurns must never have more than one permit")
+                        super.release()
+                    }
+                }
+
+                lateinit var applicationThread: Thread
+
+                // NOTE the thread clearing this is not the thread that adds to it
+                override val inputs = CopyOnWriteArrayList<String>()
+
+                // NOTE the thread clearing this is not the thread that adds to it
+                override val outputs = CopyOnWriteArrayList<String>()
+
+                override val inputReader = InputReader {
+                    if (owner === Owner.APP) {
+                        if (inputs.isNotEmpty())
+                            inputs.removeFirst()
+                        else {
+                            // application expected input that wasn't there
+                            owner = Owner.APP_DONE
+                            takeTurns.release()
+                            throw IllegalStateException("application was expecting more input than what was provided")
+                        }
+                    } else if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
+                        owner = Owner.APP_DONE
+                        throw IllegalStateException("Unable to acquire permit for application thread")
+                    } else {
+                        // NOTE at this point, the application thread has a permit and owns the data.
+                        owner = Owner.APP
+                        inputs.removeFirst()
+                    }
+                }
+
+                // NOTE the application can only output when it owns a permit on [takeTurns]
+                // NOTE when the inputs is empty, the application will release the permit, set the owner as TEST and wait for another permit
+                // NOTE only the application calls this
+                override val outPrinter = OutPrinter {
+                    // FIXME there is probably a slight race condition here.  On startup, the app might get to this code
+                    //       at the same moment the test is turning over control.  Can we say that only the app thread
+                    //       can change the value of owner?
+                    if (owner !== Owner.APP) {
+                        if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
+                            owner = Owner.APP_DONE
+                            throw IllegalStateException("Unable to acquire permit for application thread")
+                        } else {
+                            // NOTE at this point, the application thread has a permit and owns the data.
+                            owner = Owner.APP
+                        }
+                    }
+                    // NOTE at this point, the application thread has a permit and owns the data.
+                    while (inputs.isEmpty()) {
+                        owner = Owner.TEST
+                        takeTurns.release()
+                        // NOTE the semaphore is fair so the test thread should pick it up.
+                        // NOTE we want to allow this to be interrupted by the test thread
+                        if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
+                            owner = Owner.APP_DONE
+                            throw IllegalStateException("Unable to acquire permit for application thread")
+                        } else {
+                            owner = Owner.APP
+                        }
+                    }
+                    // NOTE at this point, the application thread has a permit and owns the data.
+                    outputs.add(it)
+                }
+
+                /**
+                 * Call [waitForApplicationProcessing] before validation to allow the application to finish processing.  The application will
+                 * pause automatically when the [inputs] list is emptied.
+                 */
+                // NOTE only the test thread calls this
+                override fun waitForApplicationProcessing() {
+                    when (owner) {
+                        Owner.TEST, Owner.START_UP -> {
+                            owner = Owner.APP
+                            takeTurns.release()
+                        }
+                        Owner.APP_DONE -> fail("application exited unexpectedly")
+                        Owner.APP -> fail("test and application running simultaneously")
+                    }
+                    while (owner !== Owner.APP_DONE && outputs.isEmpty()) {
+                        println("Test waiting for application thread")
+                        if (!takeTurns.tryAcquire(awaitMillis, TimeUnit.MILLISECONDS)) {
+                            stopApplication()
+                            fail("Unable to acquire permit from application thread")
+                        }
+                    }
+                }
+
+                override fun validateFinalOutput(expectedOutputs: List<String>, toInput: List<String>) {
+                    outputs.clear()
+                    inputs.addAll(toInput)
+                    val dummyMessage = "SHOULD NOT BE CONSUMED"
+                    inputs.add(dummyMessage)
+                    waitForApplicationProcessing()
+                    withClue("The application expected more input than was provided prior to quitting.") {
+                        inputs shouldContainExactly listOf(dummyMessage)
+                    }
+                    outputs shouldContainExactly expectedOutputs
+                    owner shouldBe Owner.APP_DONE
+                    applicationThread.join(awaitMillis)
+                    applicationThread.state shouldBe Thread.State.TERMINATED
+                }
+
+                override fun startApplicationForTesting(application: MenuApplication): Thread {
+                    applicationThread = thread(
+                        start = true,
+                        name = "Application Thread",
+                    ) {
+                        object : MenuApplication by application {
+                            override fun close() {
+                                application.close()
+                                // NOTE immediately give control back to test
+                                val priorOwner = owner
+                                owner = Owner.APP_DONE
+                                if (priorOwner === Owner.APP) {
+                                    takeTurns.release()
+                                }
+                            }
+                        }
+                            .use {
+                                it.runApplication()
+                            }
+                    }
+                    return applicationThread
+                }
+
+                // NOTE only test code calls this
+                override fun stopApplication() {
+                    applicationThread.interrupt()
+                    applicationThread.join()
+                    println("Application stopped")
+                }
+
+            }
     }
 
 }
