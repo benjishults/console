@@ -2,6 +2,7 @@ val kotestVersion: String by project
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    id("org.jetbrains.dokka") version "2.0.0"
     `maven-publish`
     `java-library`
 }
