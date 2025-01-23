@@ -9,6 +9,7 @@ import io.kotest.core.spec.Spec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
@@ -44,6 +45,7 @@ import kotlin.concurrent.thread
  *                     ),
  *                     toInput = listOf("", "", "2"),
  *                 )
+ *                 validateFinalOutput(listOf("Quitting"))
  * ```
  *
  * The running application will pause automatically when [inputs] is empty just prior to printing its next output
@@ -55,6 +57,14 @@ import kotlin.concurrent.thread
 interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
 
     /**
+     * Allows the application to run only until it consumes all the given input at which point the application
+     * is paused.
+     *
+     * Validates
+     * 1. that the inputs are all consumed
+     * 2. that the outputs are as expected
+     * 3. that the application is paused but not terminated (via a call to [validateApplicationPaused]).
+     *
      * Should not be called from the application thread.
      * @throws IllegalArgumentException if [toInput] is empty
      */
@@ -65,27 +75,46 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
         waitForApplicationProcessing()
         inputs.shouldBeEmpty()
         outputs shouldContainExactly expectedOutputs
+        validateApplicationPaused()
     }
 
     /**
      * Allows the application to run until it quits.
+     *
      * Validates
-     * 1. that the application consuming the given input and no more
-     * 2. that the expected output is produced
-     * 3. that the application thread finishes
+     * 1. that the application consumes the given input
+     * 2. that the application expects no more input than what is provided
+     * 3. that the expected output is produced
+     * 4. that the application thread terminates after consuming the input (via a call to [validateApplicationTerminated]).
      *
      * Should not be called from the application thread.
+     * @param toInput may be empty.  Should contain any input that is necessary to cause the application to quit.
      */
-    fun validateFinalOutput(expectedOutputs: List<String>, toInput: List<String>) {
+    fun validateFinalOutput(
+        expectedOutputs: List<String>,
+        toInput: List<String> = emptyList(),
+    ) {
         outputs.clear()
         val dummyMessage = "SHOULD NOT BE CONSUMED"
+        inputs.addAll(toInput)
         inputs.add(dummyMessage)
         waitForApplicationProcessing()
         withClue("The application expected more input than was provided prior to quitting.") {
             inputs shouldContainExactly listOf(dummyMessage)
         }
         outputs shouldContainExactly expectedOutputs
+        validateApplicationTerminated()
     }
+
+    /**
+     * Validates that the application thread is terminated.
+     */
+    fun validateApplicationTerminated()
+
+    /**
+     * Validates that the application thread is paused but not terminated.
+     */
+    fun validateApplicationPaused()
 
 // TODO add a function to validate outputs without expected input
 
@@ -97,10 +126,19 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
      */
     fun waitForApplicationProcessing()
 
+    /**
+     * Starts the application thread in a way that will cooperate with the test.
+     */
     fun startApplicationForTesting(application: MenuApplication): Thread
 
+    /**
+     * Interrupt the application thread in case it failed to stop on its own or via a call to [validateFinalOutput].
+     */
     fun stopApplication()
 
+    /**
+     * Arranges for [stopApplication] to be called after all tests in the [Spec] are finished.
+     */
     fun Spec.stopApplicationAfterSpec() {
         afterSpec {
             stopApplication()
@@ -131,6 +169,10 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
             APP_DONE,
         }
 
+        /**
+         * Produces a working implementation of [ComplexConsoleIoTestFixture] that manages the application thread
+         * via a [Semaphore] and special [OutPrinter] and [InputReader].
+         */
         operator fun invoke(awaitMillis: Long): ComplexConsoleIoTestFixture =
             object : ComplexConsoleIoTestFixture {
 
@@ -150,10 +192,10 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
                  *
                  * Should never have more than one permit.
                  *
-                 * When [owner] is [Owner.START_UP], the application cannot output until the test is ready indicated
-                 * by the test creating a permit.
+                 * When [owner] is [Owner.START_UP], the application cannot output until the test is ready.  That
+                 * readiness is indicated by the test creating a permit with a call to [Semaphore.release].
                  */
-                // NOTE the test is expected to release (create) a permit when it has inputs ready for the application
+                // NOTE the test is expected to release (or create) a permit when it has inputs ready for the application
                 // NOTE application should be careful not to call release unless it has a permit otherwise another permit will be created
                 private val takeTurns = object : Semaphore(0, true) {
                     override fun acquire() {
@@ -164,6 +206,7 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
                     }
 
                     override fun release() {
+                        // NOTE this is a not-completely-effective way to try to catch cases when there are plural permits
                         if (availablePermits() > 0)
                             throw IllegalStateException("takeTurns must never have more than one permit")
                         super.release()
@@ -254,21 +297,20 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
                     }
                 }
 
-                override fun validateFinalOutput(expectedOutputs: List<String>, toInput: List<String>) {
-                    outputs.clear()
-                    inputs.addAll(toInput)
-                    val dummyMessage = "SHOULD NOT BE CONSUMED"
-                    inputs.add(dummyMessage)
-                    waitForApplicationProcessing()
-                    withClue("The application expected more input than was provided prior to quitting.") {
-                        inputs shouldContainExactly listOf(dummyMessage)
-                    }
-                    outputs shouldContainExactly expectedOutputs
-                    owner shouldBe Owner.APP_DONE
+                override fun validateApplicationTerminated() {
                     applicationThread.join(awaitMillis)
                     applicationThread.state shouldBe Thread.State.TERMINATED
+                    owner shouldBe Owner.APP_DONE
                 }
 
+                override fun validateApplicationPaused() {
+                    owner shouldNotBe Owner.APP_DONE
+                    applicationThread.state shouldNotBe Thread.State.TERMINATED
+                }
+
+                /**
+                 * This **must** be called prior to validation.
+                 */
                 override fun startApplicationForTesting(application: MenuApplication): Thread {
                     applicationThread = thread(
                         start = true,
