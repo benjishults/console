@@ -5,10 +5,7 @@ import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.TimeZone
 
 class TimestampPromptTest : FreeSpec(),
     SimpleConsoleIoTestFixture {
@@ -19,19 +16,11 @@ class TimestampPromptTest : FreeSpec(),
     init {
         clearInputsAndOutputsBeforeEach()
         var now: LocalDateTime = LocalDateTime.parse("2024-08-09T00:00:00")
-
-        val clock = object : Clock {
-            var secondCount = 0
-            override fun now(): Instant =
-                Instant.parse(String.format("2024-08-09T00:00:%02dZ", secondCount++))
-        }
         var subject = TimestampPrompt(
-            "Use current time [Y]? ",
-            TimeZone.of("America/Chicago"),
-            clock,
-            inputReader,
-            outPrinter,
-            now,
+            queryAcceptDefault = "Use current time [Y]? ",
+            default = now,
+            inputReader = inputReader,
+            outPrinter = outPrinter,
         )
         "run prompt accepting default in America/Chicago" {
             inputs.add("")
@@ -53,11 +42,9 @@ class TimestampPromptTest : FreeSpec(),
         }
         subject = TimestampPrompt(
             "Use current time [Y]? ",
-            TimeZone.of("America/Los_Angeles"),
-            clock,
-            inputReader,
-            outPrinter,
-            now,
+            default = now,
+            inputReader = inputReader,
+            outPrinter = outPrinter,
         )
         "run prompt accepting default in America/Los_Angeles" {
             inputs.add("")
