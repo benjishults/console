@@ -22,27 +22,31 @@ private class UserNotEnteringDate(
 ) : Exception(message, cause)
 
 class TimestampPrompt(
-    queryForNow: String,
-    timeZone: TimeZone,
-    clock: Clock = Clock.System,
+    queryAcceptDefault: String,
+    default: LocalDateTime,
+    dateOnly: Boolean = false,
     inputReader: InputReader = DefaultInputReader,
     outPrinter: OutPrinter = DefaultOutPrinter,
-    now: LocalDateTime = clock.now().toLocalDateTime(timeZone),
 ) : SimplePromptWithDefault<LocalDateTime>(
-    basicPrompt = queryForNow,
-    defaultValue = now,
+    basicPrompt = queryAcceptDefault,
+    defaultValue =
+        if (dateOnly)
+            default
+                .apply { LocalDateTime(year, monthNumber, dayOfMonth, 0, 0, 0) }
+        else
+            default,
     inputReader = inputReader,
     outPrinter = outPrinter,
     transformer = { acceptDefault: String ->
         when (acceptDefault) {
             "Y", "y", "" -> {
-                now
+                default
             }
             else -> {
                 val year: Int =
                     SimplePromptWithDefault(
-                        "         year [${now.year}]: ",
-                        now.year,
+                        String.format("%13s [%4d]: ", "year", default.year),
+                        default.year,
                         inputReader,
                         outPrinter,
                         additionalValidation = AcceptNothingStringValidator("No year entered."),
@@ -51,8 +55,8 @@ class TimestampPrompt(
                         ?: throw UserNotEnteringDate()
                 val month: Int =
                     SimplePromptWithDefault(
-                        String.format("   month (1-12) [%2d]: ", now.month.value),
-                        now.month.value,
+                        String.format("%15s [%2d]: ", "month (1-12)", default.month.value),
+                        default.month.value,
                         inputReader,
                         outPrinter,
                         additionalValidation = AcceptNothingStringValidator("No month entered."),
@@ -61,8 +65,8 @@ class TimestampPrompt(
                         ?: throw UserNotEnteringDate()
                 val day: Int =
                     SimplePromptWithDefault(
-                        String.format("   day of month [%2d]: ", now.dayOfMonth),
-                        now.dayOfMonth,
+                        String.format("%15s [%2d]: ", "day of month", default.dayOfMonth),
+                        default.dayOfMonth,
                         inputReader,
                         outPrinter,
                         additionalValidation = AcceptNothingStringValidator("No day of month entered."),
@@ -70,35 +74,44 @@ class TimestampPrompt(
                         .getResult()
                         ?: throw UserNotEnteringDate()
                 val hour: Int =
-                    SimplePromptWithDefault(
-                        String.format("hour (24-clock) [%2d]: ", now.hour),
-                        now.hour,
-                        inputReader,
-                        outPrinter,
-                        additionalValidation = AcceptNothingStringValidator("No hour entered."),
-                    ) { it.toInt() }
-                        .getResult()
-                        ?: throw UserNotEnteringDate()
+                    if (dateOnly)
+                        0
+                    else
+                        SimplePromptWithDefault(
+                            String.format("%15s [%2d]: ", "hour (24-clock)", default.hour),
+                            default.hour,
+                            inputReader,
+                            outPrinter,
+                            additionalValidation = AcceptNothingStringValidator("No hour entered."),
+                        ) { it.toInt() }
+                            .getResult()
+                            ?: throw UserNotEnteringDate()
                 val minute: Int =
-                    SimplePromptWithDefault(
-                        String.format(" minute of hour [%2d]: ", now.minute),
-                        now.minute,
-                        inputReader,
-                        outPrinter,
-                        additionalValidation = AcceptNothingStringValidator("No minute entered."),
-                    ) { it.toInt() }
-                        .getResult()
-                        ?: throw UserNotEnteringDate()
+                    if (dateOnly)
+                        0
+                    else
+                        SimplePromptWithDefault(
+                            String.format("%15s [%2d]: ", "minute of hour", default.minute),
+                            default.minute,
+                            inputReader,
+                            outPrinter,
+                            additionalValidation = AcceptNothingStringValidator("No minute entered."),
+                        ) { it.toInt() }
+                            .getResult()
+                            ?: throw UserNotEnteringDate()
                 val second: Int =
-                    SimplePromptWithDefault(
-                        String.format("         second [%2d]: ", now.second),
-                        now.second,
-                        inputReader,
-                        outPrinter,
-                        additionalValidation = AcceptNothingStringValidator("No second entered."),
-                    ) { it.toInt() }
-                        .getResult()
-                        ?: throw UserNotEnteringDate()
+                    if (dateOnly)
+                        0
+                    else
+                        SimplePromptWithDefault(
+                            String.format("%15s [%2d]: ", "second", default.second),
+                            default.second,
+                            inputReader,
+                            outPrinter,
+                            additionalValidation = AcceptNothingStringValidator("No second entered."),
+                        ) { it.toInt() }
+                            .getResult()
+                            ?: throw UserNotEnteringDate()
                 LocalDateTime.parse(
                     String.format(
                         "%04d-%02d-%02dT%02d:%02d:%02d",
@@ -135,16 +148,35 @@ class TimestampPrompt(
  * @return `null` if the user doesn't enter a proper date.
  */
 fun WithIo.getTimestampFromUser(
-    queryForNow: String = "Use current time [Y]? ",
     timeZone: TimeZone,
     clock: Clock,
-): Instant? =
+    queryForNow: String = "Use current time [Y]? ",
+    dateOnly: Boolean = false,
+): LocalDateTime? =
     TimestampPrompt(
         queryForNow,
-        timeZone,
-        clock,
-        inputReader,
-        outPrinter,
+        default =
+            clock.now()
+                .toLocalDateTime(timeZone),
+        inputReader = inputReader,
+        outPrinter = outPrinter,
+        dateOnly = dateOnly,
     )
         .getResult()
-        ?.toInstant(timeZone)
+
+/**
+ * @return `null` if the user doesn't enter a proper date.
+ */
+fun WithIo.getTimestampFromUser(
+    queryAcceptDefault: String,
+    default: LocalDateTime, // = clock.now().toLocalDateTime(timeZone),
+    dateOnly: Boolean = false,
+): LocalDateTime? =
+    TimestampPrompt(
+        queryAcceptDefault = queryAcceptDefault,
+        dateOnly = dateOnly,
+        inputReader = inputReader,
+        outPrinter = outPrinter,
+        default = default,
+    )
+        .getResult()
