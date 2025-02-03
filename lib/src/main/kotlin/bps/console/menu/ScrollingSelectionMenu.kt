@@ -56,7 +56,7 @@ open class ScrollingSelectionMenu<T>(
             .also { menuItems: MutableList<MenuItem> ->
                 if (menuItems.size == limit) {
                     menuItems.incorporateItem(
-                        item("Next Items", "n") { menuSession ->
+                        item({ "Next Items" }, "n") { menuSession ->
                             menuSession.pop()
                             menuSession.push(nextPageMenuProducer())
                         },
@@ -64,7 +64,7 @@ open class ScrollingSelectionMenu<T>(
                 }
                 if (offset > 0) {
                     menuItems.incorporateItem(
-                        item("Previous Items", "p") { menuSession ->
+                        item({ "Previous Items" }, "p") { menuSession ->
                             menuSession.pop()
                             menuSession.push(previousPageMenuProducer())
                         },
@@ -103,7 +103,7 @@ open class ScrollingSelectionMenu<T>(
     protected open fun generateBaseMenuItemList() =
         itemListGenerator(limit, offset)
             .mapTo(mutableListOf()) { item ->
-                item(item.labelGenerator()) { menuSession: MenuSession ->
+                item({ item.labelGenerator() }) { menuSession: MenuSession ->
                     actOnSelectedItem(menuSession, item)
                 }
             }

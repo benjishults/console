@@ -22,7 +22,7 @@ class MenuTest : FreeSpec(),
             val bottomMenu: Menu =
                 Menu({ "bottom" }) {
                     add(
-                        takeAction("something else") {
+                        takeAction({ "something else" }) {
                             outPrinter("doing the thing\n")
                         },
                     )
@@ -37,7 +37,7 @@ class MenuTest : FreeSpec(),
                 Menu({ "top" }) {
                     add(
                         takeActionAndPush(
-                            label = "something",
+                            label = { "something" },
                             to = { bottomMenu },
                         ) {
                             outPrinter("taking some action\n")
@@ -83,7 +83,7 @@ Quitting
             val bottomMenu =
                 Menu({ "bottom" }) {
                     add(
-                        takeAction("something else") {
+                        takeAction({ "something else" }) {
                             outPrinter("doing the thing\n")
                         },
                     )
@@ -98,7 +98,7 @@ Quitting
                 Menu({ "top" }) {
                     add(
                         takeActionAndPush(
-                            label = "something",
+                            label = { "something" },
                             to = { bottomMenu },
                         ) {
                             outPrinter("taking some action\n")
