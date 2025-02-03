@@ -13,7 +13,7 @@ object NoopIntermediateAction : IntermediateMenuItemAction<Unit> {
 }
 
 interface MenuItem {
-    val label: String
+    val label: () -> String
 
     /**
      * Takes action and possibly updates the [MenuSession].
@@ -25,7 +25,7 @@ interface MenuItem {
 }
 
 open class BaseMenuItem(
-    override val label: String,
+    override val label: () -> String,
     override val shortcut: String? = null,
     override val action: MenuItemAction,
 ) : MenuItem {
@@ -35,12 +35,12 @@ open class BaseMenuItem(
     }
 
     override fun toString(): String =
-        "$label${if (shortcut !== null) " ($shortcut)" else ""}"
+        "${label()}${if (shortcut !== null) " ($shortcut)" else ""}"
 
 }
 
 fun item(
-    label: String,
+    label: () -> String,
     shortcut: String? = null,
     action: MenuItemAction,
 ): MenuItem =
@@ -52,7 +52,7 @@ fun item(
  * @param label the display of the menu item
  */
 fun popMenuItem(
-    label: String = "Back",
+    label: () -> String = { "Back" },
     shortcut: String? = null,
     intermediateAction: IntermediateMenuItemAction<Unit> = NoopIntermediateAction,
 ): MenuItem =
@@ -66,7 +66,7 @@ fun popMenuItem(
  * @param label the display of the menu item
  */
 fun takeAction(
-    label: String,
+    label: () -> String,
     shortcut: String? = null,
     intermediateAction: IntermediateMenuItemAction<Unit>,
 ): MenuItem =
@@ -78,7 +78,7 @@ fun takeAction(
  * @param label the display of the menu item
  */
 fun <T> takeActionAndPush(
-    label: String,
+    label: () -> String,
     shortcut: String? = null,
     to: (T) -> Menu? = { null },
     intermediateAction: IntermediateMenuItemAction<T>,
@@ -96,7 +96,7 @@ fun <T> takeActionAndPush(
  * @param label the display of the menu item
  */
 fun pushMenu(
-    label: String,
+    label: () -> String,
     shortcut: String? = null,
     to: () -> Menu,
 ): MenuItem =
@@ -105,6 +105,6 @@ fun pushMenu(
     }
 
 val quitItem: MenuItem =
-    BaseMenuItem("Quit", "q") { throw QuitException() }
+    BaseMenuItem({ "Quit" }, "q") { throw QuitException() }
 
 val backItem: MenuItem = popMenuItem(shortcut = "b")

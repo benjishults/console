@@ -39,7 +39,7 @@ abstract class ScrollingSelectionWithContextMenu<T, C>(
         itemListGenerator(limit, offset)
             .apply { contextStack.add(produceCurrentContext()) }
             .mapTo(mutableListOf()) { item ->
-                item(item.labelGenerator()) { menuSession: MenuSession ->
+                item({ item.labelGenerator() }) { menuSession: MenuSession ->
                     actOnSelectedItem(menuSession, item)
                 }
             }
