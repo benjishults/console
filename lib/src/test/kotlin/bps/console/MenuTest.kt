@@ -31,7 +31,15 @@ class MenuTest : FreeSpec(),
                             outPrinter("backing up\n")
                         },
                     )
-                    add(quitItem)
+                    add(
+                        quitItem(
+                            """
+                                |Quitting
+                                |
+                                |Consider running the backup if you are storing the data locally.
+                        """.trimMargin(),
+                        ),
+                    )
                 }
             val topMenu: Menu =
                 Menu({ "top" }) {
@@ -43,7 +51,15 @@ class MenuTest : FreeSpec(),
                             outPrinter("taking some action\n")
                         },
                     )
-                    add(quitItem)
+                    add(
+                        quitItem(
+                            """
+                                |Quitting
+                                |
+                                |Consider running the backup if you are storing the data locally.
+                        """.trimMargin(),
+                        ),
+                    )
                 }
             inputs.addAll(listOf("1", "2", "2"))
             MenuApplicationWithQuit(topMenu, inputReader, outPrinter)
@@ -75,6 +91,8 @@ class MenuTest : FreeSpec(),
                 """
 Quitting
 
+Consider running the backup if you are storing the data locally.
+
 """,
             )
             inputs shouldHaveSize 0
@@ -92,7 +110,15 @@ Quitting
                             outPrinter("backing up\n")
                         },
                     )
-                    add(quitItem)
+                    add(
+                        quitItem(
+                            """
+                                |Quitting
+                                |
+                                |Consider running the backup if you are storing the data locally.
+                        """.trimMargin(),
+                        ),
+                    )
                 }
             val topMenu: Menu =
                 Menu({ "top" }) {
@@ -104,7 +130,15 @@ Quitting
                             outPrinter("taking some action\n")
                         },
                     )
-                    add(quitItem)
+                    add(
+                        quitItem(
+                            """
+                                |Quitting
+                                |
+                                |Consider running the backup if you are storing the data locally.
+                        """.trimMargin(),
+                        ),
+                    )
                 }
             inputs.addAll(listOf("1", "b", "q"))
             MenuApplicationWithQuit(topMenu, inputReader, outPrinter)
@@ -135,6 +169,8 @@ Quitting
                 "Enter selection: ",
                 """
 Quitting
+
+Consider running the backup if you are storing the data locally.
 
 """,
             )
