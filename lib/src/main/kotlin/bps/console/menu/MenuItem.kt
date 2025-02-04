@@ -107,4 +107,9 @@ fun pushMenu(
 val quitItem: MenuItem =
     BaseMenuItem({ "Quit" }, "q") { throw QuitException() }
 
+fun quitItem(message: String): MenuItem =
+    BaseMenuItem({ "Quit" }, "q") {
+        throw QuitException(message)
+    }
+
 val backItem: MenuItem = popMenuItem(shortcut = "b")
