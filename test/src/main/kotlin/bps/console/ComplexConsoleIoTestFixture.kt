@@ -175,8 +175,10 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
          * Produces a working implementation of [ComplexConsoleIoTestFixture] that manages the application thread
          * via a [Semaphore] and special [OutPrinter] and [InputReader].
          */
-        operator fun invoke(awaitMillis: Long): ComplexConsoleIoTestFixture =
+        operator fun invoke(awaitMillis: Long, ignoreBlanks: Boolean = false): ComplexConsoleIoTestFixture =
             object : ComplexConsoleIoTestFixture {
+
+                override val ignoreBlanks: Boolean = ignoreBlanks
 
                 /**
                  * Should only be set by the application thread while it has a permit on [takeTurns]
@@ -279,7 +281,7 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
                 // TODO how about allow output when inputs is empty?
                 //       1. the application would start editing outputs right away (may not be a problem as long as test doesn't check those until application is paused.)
                 //       2. test would have to expect outputs in a different way
-                override val outPrinter = OutPrinter {
+                override val outPrinter = OutPrinter { output: String ->
                     when (appStatus) {
                         AppStatus.RUNNING -> {}
                         AppStatus.START_UP, AppStatus.PAUSED, AppStatus.APP_DONE -> {
@@ -310,7 +312,8 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
                         } while (!applicationHasUnackedTurnover)
                     }
                     // NOTE at this point, the application thread has a permit and owns the data.
-                    outputs.add(it)
+                    if (!ignoreBlanks || output.isNotBlank())
+                        outputs.add(output)
                 }
 
                 /**
