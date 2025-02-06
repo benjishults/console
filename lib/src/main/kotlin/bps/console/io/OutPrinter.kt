@@ -5,6 +5,10 @@ fun interface OutPrinter : (String) -> Unit {
         if (message.isNotBlank())
             invoke("\n$message\n\n")
     }
+
+    fun verticalSpace() {
+        invoke("\n")
+    }
 }
 
 val DefaultOutPrinter: OutPrinter = OutPrinter {

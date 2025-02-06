@@ -40,6 +40,9 @@ import io.kotest.core.spec.Spec
  */
 interface SimpleConsoleIoTestFixture {
 
+    val ignoreBlanks: Boolean
+        get() = false
+
     val inputs: MutableList<String>
     val inputReader
         get() = InputReader {
@@ -48,8 +51,9 @@ interface SimpleConsoleIoTestFixture {
 
     val outputs: MutableList<String>
     val outPrinter: OutPrinter
-        get() = OutPrinter {
-            outputs.add(it)
+        get() = OutPrinter { output: String ->
+            if (!ignoreBlanks || output.isNotBlank())
+                outputs.add(output)
         }
 
     fun Spec.clearInputsAndOutputsBeforeEach() {
@@ -57,6 +61,24 @@ interface SimpleConsoleIoTestFixture {
             inputs.clear()
             outputs.clear()
         }
+    }
+
+    /**
+     * Use this implementation for slightly better performance.
+     */
+    companion object : SimpleConsoleIoTestFixture {
+        override val ignoreBlanks: Boolean = false
+        override val inputs: MutableList<String> = mutableListOf()
+        override val outputs: MutableList<String> = mutableListOf()
+        override val outPrinter =
+            OutPrinter { output: String ->
+                if (!ignoreBlanks || output.isNotBlank())
+                    outputs.add(output)
+            }
+        override val inputReader: InputReader =
+            InputReader {
+                inputs.removeFirst()
+            }
     }
 
 }

@@ -168,7 +168,7 @@ fun WithIo.getTimestampFromUser(
  * @return `null` if the user doesn't enter a proper date.
  */
 fun WithIo.getTimestampFromUser(
-    queryAcceptDefault: String,
+    queryAcceptDefault: String = "Use current time [Y]? ",
     default: LocalDateTime, // = clock.now().toLocalDateTime(timeZone),
     dateOnly: Boolean = false,
 ): LocalDateTime? =

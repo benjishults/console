@@ -1,6 +1,8 @@
 //import org.jreleaser.model.Active
 
+val commonsValidatorVersion: String by project
 val kotestVersion: String by project
+val kotlinXDateTimeVersion: String by project
 val mockkVersion: String by project
 
 /*
@@ -34,8 +36,8 @@ repositories {
 
 dependencies {
     // This dependency is used internally, and not exposed to consumers on their own compile classpath.
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
-    implementation("commons-validator:commons-validator:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:$kotlinXDateTimeVersion")
+    implementation("commons-validator:commons-validator:$commonsValidatorVersion")
 
     testImplementation(platform("org.junit:junit-bom:5.10.3"))
     testImplementation("io.mockk:mockk-jvm:$mockkVersion")
