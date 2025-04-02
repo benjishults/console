@@ -35,6 +35,12 @@ abstract class ScrollingSelectionWithContextMenu<T, C>(
      */
     protected abstract fun List<T>.produceCurrentContext(): C
 
+    /**
+     * Items that push a menu onto the session will need the context to be popped when they return to this item.
+     */
+    fun popContext(): C? =
+        contextStack.removeLastOrNull()
+
     override fun generateBaseMenuItemList() =
         itemListGenerator(limit, offset)
             .apply { contextStack.add(produceCurrentContext()) }

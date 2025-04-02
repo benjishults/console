@@ -6,8 +6,7 @@ A library for building console-menu applications.
 
 Available at
 
-```xml
-
+```
 <dependency>
     <groupId>io.github.benjishults</groupId>
     <artifactId>console</artifactId>
@@ -23,8 +22,7 @@ The test library does use KoTest assertions and provides extension functions on 
 
 Available at
 
-```xml
-
+```
 <dependency>
     <groupId>io.github.benjishults</groupId>
     <artifactId>console-test</artifactId>
