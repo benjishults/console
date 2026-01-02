@@ -399,7 +399,6 @@ interface ComplexConsoleIoTestFixture : SimpleConsoleIoTestFixture {
                     withClue("application thread should have terminated within $awaitMillis milliseconds") {
                         applicationThread.state shouldBe Thread.State.TERMINATED
                     }
-                    println("Application stopped")
                 }
 
             }
